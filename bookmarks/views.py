@@ -3,7 +3,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from django.contrib.auth import get_user_model
 from .models import Bookmark
 from .serializers import (
@@ -97,6 +97,50 @@ class AuthViewSet(viewsets.GenericViewSet):
         """
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def logout(self, request):
+        """
+        로그아웃
+
+        URL: POST /api/auth/logout/
+        Headers: Authorization: Bearer <access_token>
+
+        요청:
+        {
+            "refresh": "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6I..."
+        }
+
+        응답:
+        {
+            "detail": "로그아웃되었습니다."
+        }
+        """
+        try:
+            # 1. Refresh Token 가져오기
+            refresh_token = request.data.get('refresh')
+
+            if not refresh_token:
+                return Response(
+                    {'detail': 'Refresh token이 필요합니다.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # 2. Refresh Token 블랙리스트에 추가
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            # 내부적으로 token_blacklist_blacklistedtoken 테이블에 추가됨
+
+            return Response(
+                {'detail': '로그아웃되었습니다.'},
+                status=status.HTTP_200_OK
+            )
+
+        except TokenError:
+            return Response(
+                {'detail': '유효하지 않은 토큰입니다.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 class BookmarkViewSet(viewsets.ModelViewSet):
     """
